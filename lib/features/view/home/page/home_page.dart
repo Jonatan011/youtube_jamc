@@ -6,8 +6,10 @@ import 'package:flutter/widgets.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 import 'package:youtube_jamc/features/controllers/home_controller.dart';
+import 'package:youtube_jamc/features/models/play_list_model_response.dart';
 import 'package:youtube_jamc/features/models/videos_youtube_response_model.dart';
 import 'package:youtube_jamc/features/view/home/page/play_list.dart';
+import 'package:youtube_jamc/features/view/home/widgets/items_play_list.dart';
 import 'package:youtube_jamc/features/view/video_player/video_player_page.dart';
 import 'package:youtube_jamc/util/bottom_navigator.dart';
 
@@ -43,6 +45,7 @@ class _HomePageState extends State<HomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       homeController.isPlayerMinimized.value = false;
       homeController.videoIds.value = [];
+      homeController.isPlayListValue.value = false;
     });
   }
 
@@ -182,7 +185,9 @@ class _HomePageState extends State<HomePage> {
     return Obx(
       () => ListView.builder(
         shrinkWrap: true,
-        itemCount: homeController.videos.value.items.length + (homeController.isLoading.value ? 1 : 0),
+        itemCount: !homeController.isPlayListValue.value
+            ? homeController.videos.value.items.length
+            : homeController.playlistVideos.value.items.length + (homeController.isLoading.value ? 1 : 0),
         itemBuilder: (BuildContext context, int index) {
           homeController.saveload.value;
           if (index >= homeController.videos.value.items.length) {
@@ -192,8 +197,11 @@ class _HomePageState extends State<HomePage> {
               child: const CircularProgressIndicator(color: Colors.red),
             );
           }
+          if (homeController.isPlayListValue.value) {
+            PlaylistItem item = homeController.playlistVideos.value.items[index];
+            return buildVideoPlayListItem(item, context);
+          }
           MediaItem video = homeController.videos.value.items[index];
-
           return buildVideoListItem(video);
         },
       ),
@@ -226,6 +234,7 @@ class _HomePageState extends State<HomePage> {
 
     return GestureDetector(
       onTap: () {
+        homeController.isPlayListValue.value = false;
         if (video.isPlaylist) {
           removeFloatingVideoPlayer();
           // Si es una lista de reproducción, navega a la página de la lista de reproducción

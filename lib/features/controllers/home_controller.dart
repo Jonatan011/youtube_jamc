@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -7,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:youtube_jamc/features/models/play_list_model_response.dart';
 import 'package:youtube_jamc/features/models/videos_youtube_response_model.dart';
 
 class HomeController extends GetxController {
@@ -19,25 +19,20 @@ class HomeController extends GetxController {
   RxBool isPlayerMinimized = false.obs;
   RxBool isPlayerFinish = false.obs;
   RxList<String> videoIds = <String>[].obs;
+  RxBool isPlayListValue = false.obs;
+
+  var playlistVideos =
+      PlaylistItemListResponse(items: [], nextPageToken: '', kind: '', etag: '', pageInfo: PageInfo(totalResults: 0, resultsPerPage: 0)).obs;
 
   final Rx<DraggableScrollableController> controllerDraggable = DraggableScrollableController().obs;
+
   Rx<MediaListResponse> videos = MediaListResponse(
       kind: "",
       etag: "",
       items: [],
       nextPageToken: "",
       pageInfo: PageInfo(
-        totalResults: 10,
-        resultsPerPage: 0,
-      )).obs;
-
-  Rx<MediaListResponse> playList = MediaListResponse(
-      kind: "",
-      etag: "",
-      items: [],
-      nextPageToken: "",
-      pageInfo: PageInfo(
-        totalResults: 10,
+        totalResults: 0,
         resultsPerPage: 0,
       )).obs;
 
@@ -86,7 +81,7 @@ class HomeController extends GetxController {
         items: [],
         nextPageToken: "",
         pageInfo: PageInfo(
-          totalResults: 10,
+          totalResults: 0,
           resultsPerPage: 0,
         )); // Limpia los resultados previos
     nextPageToken.value = ''; // Reinicia el token de página
@@ -187,6 +182,7 @@ class HomeController extends GetxController {
         saveload.value = !saveload.value;
       } else if (videoResponse.statusCode == 401 || playlistResponse.statusCode == 401) {
         await refreshToken();
+        isLoading.value = false;
         return searchYouTubeVideos(query, pageToken: pageToken); // Intenta de nuevo con un token fresco
       } else {
         throw Exception('Failed to load search results');
@@ -220,19 +216,21 @@ class HomeController extends GetxController {
 
     // Intenta obtener datos del caché
     String cacheKey = 'music_videos';
-    String? cachedData = prefs.getString(cacheKey);
-    if (cachedData != null) {
-      var videoData = jsonDecode(cachedData);
-      videos.value = MediaListResponse.fromJson(videoData);
-      isLoading.value = false;
-      return;
+    if (pageToken.isEmpty) {
+      String? cachedData = prefs.getString(cacheKey);
+      if (cachedData != null) {
+        var videoData = jsonDecode(cachedData);
+        videos.value = MediaListResponse.fromJson(videoData);
+        isLoading.value = false;
+        return;
+      }
     }
 
     try {
       // Obtener videos de música recomendados
       String musicVideosURL = 'https://www.googleapis.com/youtube/v3/search';
-      String videoQueryParams = 'part=snippet&maxResults=25&type=video&videoCategoryId=10&order=relevance';
-      String playlistQueryParams = 'part=snippet&maxResults=25&type=playlist&order=relevance&q=music';
+      String videoQueryParams = 'part=snippet&maxResults=50&type=video&videoCategoryId=10&order=relevance';
+      String playlistQueryParams = 'part=snippet&maxResults=50&type=playlist&order=relevance&q=music';
       if (pageToken.isNotEmpty) {
         videoQueryParams += '&pageToken=$pageToken';
         playlistQueryParams += '&pageToken=$pageToken';
@@ -276,11 +274,9 @@ class HomeController extends GetxController {
           items: combinedItems,
         );
 
-        // Guarda la respuesta en caché
-        prefs.setString(cacheKey, jsonEncode(videoData));
-
         if (pageToken.isEmpty) {
           videos.value = newCombinedList;
+          prefs.setString(cacheKey, jsonEncode(newCombinedList.toJson()));
         } else {
           videos.value.items.addAll(newCombinedList.items);
         }
@@ -288,6 +284,7 @@ class HomeController extends GetxController {
         saveload.value = !saveload.value;
       } else if (videoResponse.statusCode == 401 || playlistResponse.statusCode == 401) {
         await refreshToken();
+        isLoading.value = false;
         return fetchYouTubeMusic(pageToken: pageToken); // Intenta de nuevo con un token fresco
       } else {
         throw Exception('Failed to load music videos and playlists');
@@ -301,15 +298,13 @@ class HomeController extends GetxController {
   }
 
   Future<void> fetchPlaylistItems(String playlistId, {String pageToken = ''}) async {
-    videos.value = MediaListResponse(
-        kind: "",
-        etag: "",
-        items: [],
-        nextPageToken: "",
-        pageInfo: PageInfo(
-          totalResults: 10,
-          resultsPerPage: 0,
-        ));
+    playlistVideos.value = PlaylistItemListResponse(
+      kind: "",
+      etag: "",
+      items: [],
+      nextPageToken: "",
+      pageInfo: PageInfo(totalResults: 0, resultsPerPage: 0),
+    );
     videoIds.value = [];
     if (isLoading.value) {
       return; // Evita ejecuciones concurrentes
@@ -331,7 +326,7 @@ class HomeController extends GetxController {
 
     try {
       String playlistItemsURL = 'https://www.googleapis.com/youtube/v3/playlistItems';
-      String queryParams = 'part=snippet&maxResults=25&playlistId=$playlistId';
+      String queryParams = 'part=snippet,contentDetails&maxResults=50&playlistId=$playlistId';
       if (pageToken.isNotEmpty) {
         queryParams += '&pageToken=$pageToken';
       }
@@ -343,12 +338,13 @@ class HomeController extends GetxController {
 
       if (response.statusCode == 200) {
         var data = jsonDecode(response.body);
-        MediaListResponse playlistItems = MediaListResponse.fromJson(data);
+        PlaylistItemListResponse playlistItems = PlaylistItemListResponse.fromJson(data);
 
         if (pageToken.isEmpty) {
-          videos.value = playlistItems;
+          playlistVideos.value.items.clear();
+          playlistVideos.value.items.addAll(playlistItems.items);
         } else {
-          videos.value.items.addAll(playlistItems.items);
+          playlistVideos.value.items.addAll(playlistItems.items);
         }
         nextPageToken.value = data['nextPageToken'] ?? '';
         saveload.value = !saveload.value;
@@ -372,39 +368,46 @@ class HomeController extends GetxController {
   }
 
   Future<void> refreshToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final refreshToken = prefs.getString('refreshToken');
+
+    if (refreshToken == null) {
+      print("No refresh token found.");
+      Get.snackbar('Token Error', 'No refresh token found.');
+      return;
+    }
+
     final jsonString = await rootBundle.loadString('config.json');
     final config = json.decode(jsonString);
     String clientId = config['web']['client_id'];
     String clientSecret = config['web']['client_secret'];
     String tokenUri = 'https://oauth2.googleapis.com/token';
-    final prefs = await SharedPreferences.getInstance();
-    final refreshToken = prefs.getString('refreshToken');
-    if (refreshToken != null) {
-      try {
-        final response = await http.post(
-          Uri.parse(tokenUri),
-          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-          body: {
-            'client_id': clientId,
-            'client_secret': clientSecret,
-            'refresh_token': refreshToken,
-            'grant_type': 'refresh_token',
-          },
-        );
 
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          final accessToken = data['access_token'];
+    try {
+      final response = await http.post(
+        Uri.parse(tokenUri),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'client_id': clientId,
+          'client_secret': clientSecret,
+          'refresh_token': refreshToken,
+          'grant_type': 'refresh_token',
+        },
+      );
 
-          await prefs.setString('accessToken', accessToken);
-        } else {
-          print("Failed to refresh token: ${response.body}");
-          throw Exception('Failed to refresh token');
-        }
-      } catch (e) {
-        print("Error: $e");
-        Get.snackbar('Token Error', 'Failed to refresh token: $e');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final accessToken = data['access_token'];
+
+        await prefs.setString('accessToken', accessToken);
+        print("Token refreshed successfully: $accessToken");
+      } else {
+        print("Failed to refresh token: ${response.body}");
+        throw Exception('Failed to refresh token');
       }
+    } catch (error) {
+      print("Error refreshing token: $error");
+      Get.snackbar('Token Error', 'Failed to refresh token: $error');
     }
   }
 }

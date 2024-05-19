@@ -32,21 +32,25 @@ class _MyHomePageState extends State<VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = YoutubePlayerController(
-      initialVideoId: widget.ids.first,
-      flags: const YoutubePlayerFlags(
-        mute: false,
-        autoPlay: true,
-        disableDragSeek: false,
-        loop: false,
-        isLive: false,
-        forceHD: false,
-        enableCaption: true,
-      ),
-    )..addListener(listener);
-    _idController = TextEditingController();
-    _seekToController = TextEditingController();
-    _videoMetaData = const YoutubeMetaData();
+    try {
+      _controller = YoutubePlayerController(
+        initialVideoId: widget.ids.isNotEmpty ? widget.ids.first : "",
+        flags: const YoutubePlayerFlags(
+          mute: false,
+          autoPlay: true,
+          disableDragSeek: false,
+          loop: false,
+          isLive: false,
+          forceHD: false,
+          enableCaption: true,
+        ),
+      )..addListener(listener);
+      _idController = TextEditingController();
+      _seekToController = TextEditingController();
+      _videoMetaData = const YoutubeMetaData();
+    } catch (e) {
+      print(e);
+    }
   }
 
   void listener() {
@@ -69,6 +73,14 @@ class _MyHomePageState extends State<VideoPlayerScreen> {
     _idController.dispose();
     _seekToController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant VideoPlayerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.ids != widget.ids && widget.ids.isNotEmpty) {
+      _controller.load(widget.ids[0]);
+    }
   }
 
   void _togglePlayerSize() {
@@ -108,13 +120,17 @@ class _MyHomePageState extends State<VideoPlayerScreen> {
                     child: Row(
                       children: [
                         Expanded(
+                            child: TextButton(
+                          onPressed: () {
+                            homeController.isPlayerMinimizedOrMaximixed(false);
+                          },
                           child: Text(
                             _controller.metadata.title,
                             style: const TextStyle(color: Colors.white, fontSize: 16.0), // Tamaño de fuente aumentado
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                           ),
-                        ),
+                        )),
                         IconButton(
                           icon: Icon(_controller.value.isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
                           onPressed: _isPlayerReady

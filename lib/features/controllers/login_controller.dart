@@ -15,6 +15,13 @@ class AuthController extends GetxController {
   var isSignedIn = false.obs;
 
   static const platform = MethodChannel('com.app.youtube_jamc/auth');
+  final List<String> scopes = [
+    'openid',
+    'email',
+    'profile',
+    'https://www.googleapis.com/auth/youtube.readonly',
+    'https://www.googleapis.com/auth/youtube'
+  ];
 
   @override
   void onInit() {
@@ -34,7 +41,7 @@ class AuthController extends GetxController {
       final config = json.decode(jsonString);
       clientId = config['web']['client_id'];
       clientSecret = config['web']['client_secret'];
-      redirectUri = config['web']['redirect_uris'][0]; // Ajusta esto según tu configuración
+      redirectUri = config['web']['redirect_uris'][0];
       authUri = config['web']['auth_uri'];
       tokenUri = config['web']['token_uri'];
       print('Configuration loaded successfully');
@@ -47,7 +54,9 @@ class AuthController extends GetxController {
   Future<void> _checkAuthState() async {
     final prefs = await SharedPreferences.getInstance();
     final accessToken = prefs.getString('accessToken');
-    if (accessToken != null && accessToken.isNotEmpty) {
+    final refreshToken = prefs.getString('refreshToken');
+
+    if (accessToken != null && accessToken.isNotEmpty && refreshToken != null && refreshToken.isNotEmpty) {
       isSignedIn.value = true;
       Get.offAllNamed("/home");
     } else {
@@ -61,34 +70,27 @@ class AuthController extends GetxController {
         'response_type': 'code',
         'client_id': clientId,
         'redirect_uri': redirectUri,
-        'scope': 'email https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/youtube',
+        'scope': scopes.join(' '),
         'access_type': 'offline',
-        'state': 'some_random_state', // Agrega un estado para manejar la solicitud
-        'include_granted_scopes': 'true',
+        'prompt': 'consent',
       });
 
       print("Launching authentication URL: $url");
 
-      await FlutterWebAuth.authenticate(
+      final result = await FlutterWebAuth.authenticate(
         url: url.toString(),
-        callbackUrlScheme: 'youtubejamc', // Esquema de URL personalizado de tu aplicación
-        preferEphemeral: true, // Intenta usar una sesión efímera si es posible
+        callbackUrlScheme: 'youtubejamc',
+        preferEphemeral: true,
       );
-    } catch (error) {
-      print("Authentication error: $error");
-      Get.snackbar('Login Error', 'Failed to sign in with YouTube: $error');
-    }
-  }
 
-  Future<void> codeRecived(String? code) async {
-    try {
+      final code = Uri.parse(result).queryParameters['code'];
+
       if (code != null) {
         await _getToken(code);
         isSignedIn.value = true;
         Get.offAllNamed("/home");
       } else {
-        print("Authorization code not found in the result.");
-        Get.snackbar('Login Error', 'Authorization code not found.');
+        throw Exception('Authorization code not found');
       }
     } catch (error) {
       print("Authentication error: $error");
@@ -135,7 +137,6 @@ class AuthController extends GetxController {
     switch (call.method) {
       case 'handleAuthCode':
         String code = call.arguments;
-        codeRecived(code);
         await _getToken(code); // Manejar el código de autorización
         break;
       default:
@@ -165,6 +166,7 @@ class AuthController extends GetxController {
           final accessToken = data['access_token'];
 
           await prefs.setString('accessToken', accessToken);
+          print("Token refreshed successfully: $accessToken");
         } else {
           print("Failed to refresh token: ${response.body}");
           throw Exception('Failed to refresh token');

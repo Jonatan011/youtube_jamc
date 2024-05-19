@@ -1,11 +1,13 @@
-class MediaListResponse {
+import 'package:youtube_jamc/features/models/videos_youtube_response_model.dart';
+
+class PlaylistItemListResponse {
   final String kind;
   final String etag;
-  final List<MediaItem> items;
+  final List<PlaylistItem> items;
   final String nextPageToken;
   final PageInfo pageInfo;
 
-  MediaListResponse({
+  PlaylistItemListResponse({
     required this.kind,
     required this.etag,
     required this.items,
@@ -13,11 +15,11 @@ class MediaListResponse {
     required this.pageInfo,
   });
 
-  factory MediaListResponse.fromJson(Map<String, dynamic> json) {
-    return MediaListResponse(
+  factory PlaylistItemListResponse.fromJson(Map<String, dynamic> json) {
+    return PlaylistItemListResponse(
       kind: json['kind'] ?? '',
       etag: json['etag'] ?? '',
-      items: List<MediaItem>.from(json['items'].map((x) => MediaItem.fromJson(x))),
+      items: List<PlaylistItem>.from(json['items'].map((x) => PlaylistItem.fromJson(x))),
       nextPageToken: json['nextPageToken'] ?? '',
       pageInfo: PageInfo.fromJson(json['pageInfo'] ?? {}),
     );
@@ -32,41 +34,31 @@ class MediaListResponse {
       };
 }
 
-class MediaItem {
+class PlaylistItem {
   final String kind;
   final String etag;
   final String id;
   final Snippet snippet;
+  final ContentDetails contentDetails;
   final bool isPlaylist;
 
-  MediaItem({
+  PlaylistItem({
     required this.kind,
     required this.etag,
     required this.id,
     required this.snippet,
+    required this.contentDetails,
     required this.isPlaylist,
   });
 
-  factory MediaItem.fromJson(Map<String, dynamic> json) {
-    String mediaId;
-    bool isPlaylist = false;
-
-    if (json['id'] is Map) {
-      if (json['id']['kind'] == 'youtube#playlist') {
-        mediaId = json['id']['playlistId'];
-        isPlaylist = true;
-      } else {
-        mediaId = json['id']['videoId'] ?? json['id'];
-      }
-    } else {
-      mediaId = json['id'];
-    }
-
-    return MediaItem(
+  factory PlaylistItem.fromJson(Map<String, dynamic> json) {
+    bool isPlaylist = json['contentDetails'] != null && json['contentDetails']['videoId'] == null;
+    return PlaylistItem(
       kind: json['kind'] ?? '',
       etag: json['etag'] ?? '',
-      id: mediaId,
+      id: json['id'] ?? '',
       snippet: Snippet.fromJson(json['snippet'] ?? {}),
+      contentDetails: ContentDetails.fromJson(json['contentDetails'] ?? {}),
       isPlaylist: isPlaylist,
     );
   }
@@ -76,6 +68,29 @@ class MediaItem {
         'etag': etag,
         'id': id,
         'snippet': snippet.toJson(),
+        'contentDetails': contentDetails.toJson(),
+      };
+}
+
+class ContentDetails {
+  final String? videoId;
+  final String? videoPublishedAt;
+
+  ContentDetails({
+    this.videoId,
+    this.videoPublishedAt,
+  });
+
+  factory ContentDetails.fromJson(Map<String, dynamic> json) {
+    return ContentDetails(
+      videoId: json['videoId'],
+      videoPublishedAt: json['videoPublishedAt'],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'videoId': videoId,
+        'videoPublishedAt': videoPublishedAt,
       };
 }
 
@@ -204,25 +219,5 @@ class Localized {
   Map<String, dynamic> toJson() => {
         'title': title,
         'description': description,
-      };
-}
-
-class PageInfo {
-  final int totalResults;
-  final int resultsPerPage;
-
-  PageInfo({
-    required this.totalResults,
-    required this.resultsPerPage,
-  });
-
-  factory PageInfo.fromJson(Map<String, dynamic> json) => PageInfo(
-        totalResults: json['totalResults'] ?? 0,
-        resultsPerPage: json['resultsPerPage'] ?? 0,
-      );
-
-  Map<String, dynamic> toJson() => {
-        'totalResults': totalResults,
-        'resultsPerPage': resultsPerPage,
       };
 }
