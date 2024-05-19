@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -371,7 +372,8 @@ class HomeController extends GetxController {
   }
 
   Future<void> refreshToken() async {
-    final config = await loadConfig();
+    final jsonString = await rootBundle.loadString('config.json');
+    final config = json.decode(jsonString);
     String clientId = config['web']['client_id'];
     String clientSecret = config['web']['client_secret'];
     String tokenUri = 'https://oauth2.googleapis.com/token';

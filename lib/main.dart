@@ -18,39 +18,8 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  static const platform = MethodChannel('com.app.youtube_jamc/auth');
-
-  @override
-  void initState() {
-    super.initState();
-    platform.setMethodCallHandler(_handleMethod);
-  }
-
-  Future<void> _handleMethod(MethodCall call) async {
-    switch (call.method) {
-      case 'handleAuthCode':
-        String code = call.arguments;
-        // Manejar el código de autorización
-        _handleAuthCode(code);
-        break;
-      default:
-        throw MissingPluginException('No se maneja el método: ${call.method}');
-    }
-  }
-
-  void _handleAuthCode(String code) {
-    AuthController controller = Get.find();
-    controller.codeRecived(code);
-    print("Código de autorización recibido: $code");
-  }
 
   @override
   Widget build(BuildContext context) {

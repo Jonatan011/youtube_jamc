@@ -1,6 +1,5 @@
 import 'package:get/get.dart';
 import 'dart:convert';
-import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_web_auth/flutter_web_auth.dart';
@@ -20,25 +19,25 @@ class AuthController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _loadConfig();
-    _checkAuthState();
-    platform.setMethodCallHandler(_handleMethod);
+    _initializeController();
   }
 
-  Future<Map<String, dynamic>> loadConfig() async {
-    final file = File('config.json');
-    final jsonString = await file.readAsString();
-    return json.decode(jsonString);
+  Future<void> _initializeController() async {
+    await _loadConfig();
+    await _checkAuthState();
+    platform.setMethodCallHandler(_handleMethod);
   }
 
   Future<void> _loadConfig() async {
     try {
-      final config = await loadConfig();
+      final jsonString = await rootBundle.loadString('config.json');
+      final config = json.decode(jsonString);
       clientId = config['web']['client_id'];
       clientSecret = config['web']['client_secret'];
       redirectUri = config['web']['redirect_uris'][0]; // Ajusta esto según tu configuración
       authUri = config['web']['auth_uri'];
       tokenUri = config['web']['token_uri'];
+      print('Configuration loaded successfully');
     } catch (e) {
       print("Error loading config: $e");
       Get.snackbar('Config Error', 'Failed to load configuration: $e');
@@ -136,6 +135,7 @@ class AuthController extends GetxController {
     switch (call.method) {
       case 'handleAuthCode':
         String code = call.arguments;
+        codeRecived(code);
         await _getToken(code); // Manejar el código de autorización
         break;
       default:
